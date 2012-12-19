@@ -50,6 +50,10 @@ There is still a small window at the start of the WSGI request when another requ
 
 AJAX requests are cached separately from other requests. This is useful for sites which return different content for AJAX requests than for normal requests. This feature can't currently be switched off, although it probably should.
 
+#### Delete precompressed versions of the cached pages
+
+Delete gzipped page if it is found in the same directory as the original one (`'{0}.gz'.format(filename)`). These pages can be served transparently with Nginx `gzip_static` option. You'll probably want to create a separate cron job to compress files. Use command like this: `gzip -c $filename > $filename.gz` to preserve originals.
+
 #### Apache-friendly file names
 
 Question marks in URLs are encoded as the string `%3F` in file names, because it's not possible to stop Apache from stripping out the query string out before finding files from disk. Also, a trailing `%3F` is included even if there is no query string. This allows for simpler rewrite rules.
@@ -170,7 +174,10 @@ This configuration snippet shows how Nginx can automatically show the index.html
     
         server {
             server_name  example.com;
-            root   /var/www/myproject/generated/fresh;
+            root         /var/www/myproject/generated/fresh;
+            # Will serve gzipped file if found. You'll need to create
+            # a separate cron job to precompress them.
+            gzip_static  on;
 
             location / {
                 default_type  text/html;
