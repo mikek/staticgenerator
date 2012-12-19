@@ -251,6 +251,14 @@ class StaticGenerator(object):
         # stale version for the duration of the request.
         hardlink(stale_filename, fresh_filename,
                  ignore_src=True, ignore_dst=True)
+        # Also try to delete old gzipped file if it exists.
+        gzipped_filename = '{0}.gz'.format(fresh_filename)
+        try:
+            if os.path.exists(gzipped_filename):
+                os.remove(gzipped_filename)
+        except:
+            raise StaticGeneratorException('Could not delete file: '
+                                           '%s' % gzipped_filename)
 
     def publish_stale_path(self, path, query_string=None, is_ajax=False):
         """Publishes a stale page in the given path if it exists
@@ -332,11 +340,12 @@ class StaticGenerator(object):
         filename = self.get_filename_from_path(
             u'fresh{0}'.format(path), query_string, is_ajax=is_ajax)
 
-        try:
-            if os.path.exists(filename):
-                os.remove(filename)
-        except:
-            raise StaticGeneratorException('Could not delete file: %s' % filename)
+        for f in (filename, '{0}.gz'.format(filename)):
+            try:
+                if os.path.exists(f):
+                    os.remove(f)
+            except:
+                raise StaticGeneratorException('Could not delete file: %s' % f)
 
         try:
             os.rmdir(os.path.dirname(filename))
