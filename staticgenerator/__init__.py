@@ -25,7 +25,9 @@ logger = logging.getLogger('staticgenerator')
 
 
 class StaticGeneratorException(Exception):
-    pass
+    def __init__(self, message, **kwargs):
+        super(StaticGeneratorException, self).__init__(message)
+        self.__dict__.update(kwargs)
 
 
 def create_directory(directory):
@@ -39,9 +41,8 @@ def create_directory(directory):
     try:
         os.makedirs(directory)
     except Exception as exc:
-        raise StaticGeneratorException(
-            'Could not create the directory: {0}. {1}'
-            .format(directory, exc))
+        raise StaticGeneratorException('Could not create directory',
+                                       directory=directory)
 
 
 def hardlink(src, dst, remove_dst=False, ignore_src=False, ignore_dst=False):
@@ -63,25 +64,31 @@ def hardlink(src, dst, remove_dst=False, ignore_src=False, ignore_dst=False):
             os.remove(dst)
         except OSError as exc:
             if exc.errno != 2:  # 2 = existing destination file not found
-                raise StaticGeneratorException(
-                    'Could not delete file {0}. {1}'.format(dst, exc))
+                raise StaticGeneratorException('Could not delete file',
+                                               dst=dst)
     try:
         os.link(src, dst)
         logger.debug('Linked %s to %s', src, dst)
     except OSError as exc:
         if exc.errno == 2 and ignore_src:
-            logger.debug('%s not found, ignoring', src)
+            logger.debug('Source file not found, ignoring',
+                         exc_info=True,
+                         extra={'src': src})
             return
         if exc.errno == 17 and ignore_dst:
-            logger.debug('%s already exists, ignoring', dst)
+            logger.debug('Destination file already exists, ignoring',
+                         exc_info=True,
+                         extra={'dst': dst})
             return
-        logger.debug('Cannot link %s to %s: %s', src, dst, exc)
-        raise StaticGeneratorException(
-            'Could not link {0} to {1}. {2}'.format(src, dst, exc))
+        logger.debug('Cannot link file',
+                     exc_info=True,
+                     extra={'src': src, 'dst': dst})
+        raise StaticGeneratorException('Could not link file', src=src, dst=dst)
     except Exception as exc:
-        logger.debug('Cannot link %s to %s: %s', src, dst, exc)
-        raise StaticGeneratorException(
-            'Could not link {0} to {1}. {2}'.format(src, dst, exc))
+        logger.debug('Cannot link file',
+                     exc_info=True,
+                     extra={'src': src, 'dst': dst})
+        raise StaticGeneratorException('Could not link file', src=src, dst=dst)
 
 
 class StaticGenerator(object):
@@ -220,9 +227,10 @@ class StaticGenerator(object):
             # content for AJAX requests.
             path += ',ajax'
 
-        filename = os.path.join(self.web_root, path.lstrip('/')).encode('utf-8')
+        filename = (os.path.join(self.web_root, path.lstrip('/'))
+                    .encode('utf-8'))
         if len(filename) > 255:
-            return None, None
+            return None
         return filename
 
     def _get_publish_data(self, path, query_string, is_ajax):
@@ -268,7 +276,8 @@ class StaticGenerator(object):
         """
         fresh_filename, stale_filename = self._get_publish_data(
             path, query_string, is_ajax)
-        self._publish_stale_file(fresh_filename, stale_filename)
+        if fresh_filename:  # too long URLs not cached
+            self._publish_stale_file(fresh_filename, stale_filename)
 
     def publish_from_path(self,
                           path,
@@ -307,8 +316,8 @@ class StaticGenerator(object):
             os.close(f)
         except Exception as exc:
             raise StaticGeneratorException(
-                'Could not write temporary fresh file: {0}. {1}'
-                .format(fresh_filename, exc))
+                'Could not write temporary fresh file',
+                fresh_directory=fresh_directory)
         try:
             os.chmod(tmpname,
                      stat.S_IREAD |
@@ -318,11 +327,12 @@ class StaticGenerator(object):
                      stat.S_IRGRP |
                      stat.S_IROTH)
             os.rename(tmpname, fresh_filename)
-        except Exception as exc:
+        except Exception:
             logger.warning(
-                'Could not chmod or rename fresh file: {0}. '
-                'Temporary file probably removed by invalidation. {1}'
-                .format(fresh_filename, exc))
+                'Could not chmod or rename fresh file. '
+                'Temporary file probably removed by invalidation.',
+                exc_info=True,
+                extra={'fresh_filename': fresh_filename})
         else:
             # The fresh version of the cached file is now on the disk.  Now
             # create a hard link to it in the stale cache directory.
@@ -345,8 +355,8 @@ class StaticGenerator(object):
                 if os.path.exists(f):
                     os.remove(f)
             except:
-                raise StaticGeneratorException('Could not delete file: %s' % f)
-
+                raise StaticGeneratorException('Could not delete file',
+                                               filename=f)
         try:
             os.rmdir(os.path.dirname(filename))
         except OSError:
