@@ -279,7 +279,8 @@ class StaticGeneratorWithWebRootSetting_Tests(TestCase):
 
             instance.delete_from_path('/some_path')
 
-        remove.assert_called_once_with('test_web_root/fresh/some_path')
+        remove.assert_has_calls([call('test_web_root/fresh/some_path'),
+                                 call('test_web_root/fresh/some_path.gz')])
 
     def test_delete_from_path_does_not_delete_stale_file(self):
         instance = StaticGenerator()
@@ -314,7 +315,9 @@ class StaticGeneratorWithWebRootSetting_Tests(TestCase):
             instance.delete()
 
         remove.assert_has_calls([call('test_web_root/fresh/some_path'),
-                                 call('test_web_root/fresh/some_path_2')])
+                                 call('test_web_root/fresh/some_path.gz'),
+                                 call('test_web_root/fresh/some_path_2'),
+                                 call('test_web_root/fresh/some_path_2.gz')])
 
     def test_can_create_dummy_handler(self):
         handler = staticgenerator.DummyHandler()
