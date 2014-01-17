@@ -321,18 +321,23 @@ class StaticGeneratorWithWebRootSetting_Tests(TestCase):
             call(ANY, 'test_web_root/fresh/some_path_1'),
             call(ANY, 'test_web_root/fresh/some_path_2')])
 
+    @override_settings(LANGUAGES=(('en', 'English'), ('fr', 'French')),
+                       LANGUAGE_CODE='en')
     def test_delete_loops_through_all_resources(self):
-        instance = StaticGenerator('/some_path', '/some_path_2')
+        instance = StaticGenerator('/path_one', '/path/two')
         remove = Mock()
         with nested(patch('os.path.exists', Mock(return_value=True)),
                     patch('os.remove', remove)):
-
             instance.delete()
-
-        remove.assert_has_calls([call('test_web_root/fresh/some_path'),
-                                 call('test_web_root/fresh/some_path.gz'),
-                                 call('test_web_root/fresh/some_path_2'),
-                                 call('test_web_root/fresh/some_path_2.gz')])
+        # default language cache path contains no language code
+        remove.assert_has_calls([call('test_web_root/fresh/path_one'),
+                                 call('test_web_root/fresh/path_one.gz'),
+                                 call('test_web_root/fresh/fr.path_one'),
+                                 call('test_web_root/fresh/fr.path_one.gz'),
+                                 call('test_web_root/fresh/path/two'),
+                                 call('test_web_root/fresh/path/two.gz'),
+                                 call('test_web_root/fresh/path/fr.two'),
+                                 call('test_web_root/fresh/path/fr.two.gz')])
 
     def test_can_create_dummy_handler(self):
         handler = staticgenerator.DummyHandler()

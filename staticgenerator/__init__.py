@@ -125,6 +125,7 @@ class StaticGenerator(object):
     def __init__(self, *resources):
         self.resources = self.extract_resources(resources)
         self.server_name = self.get_server_name()
+        self.secondary_languages = self.get_secondary_languages()
 
         try:
             self.web_root = getattr(settings, 'WEB_ROOT')
@@ -178,6 +179,18 @@ class StaticGenerator(object):
         except:
             print '*** Warning ***: Using "localhost" for domain name. Use django.contrib.sites or set settings.SERVER_NAME to disable this warning.'
             return 'localhost'
+
+    def get_secondary_languages(self):
+        """
+        Get a tuple of languages to be used to delete individual cache files.
+        """
+        self.web_root = getattr(settings, 'STATIC_GENERATOR_LANGUAGES',
+                                settings.LANGUAGES)
+        languages = []
+        for lang in zip(*settings.LANGUAGES)[0]:
+            if lang != settings.LANGUAGE_CODE:
+                languages.append(lang)
+        return languages
 
     def get_content_from_path(self, path):
         """
@@ -271,7 +284,7 @@ class StaticGenerator(object):
         # stale version for the duration of the request.
         hardlink(stale_filename, fresh_filename,
                  ignore_src=True, ignore_dst=True)
-        # Also try to delete old gzipped file if it exists.
+        # Also try to delete old gzipped file if it exists (which is unlikely).
         gzipped_filename = '{0}.gz'.format(fresh_filename)
         try:
             if os.path.exists(gzipped_filename):
@@ -356,19 +369,28 @@ class StaticGenerator(object):
             u'fresh{0}'.format(path), '')
         shutil.rmtree(os.path.dirname(filename), True)
 
+    def _get_localized_filenames(self, filename):
+        path_components = list(os.path.split(filename))
+        basename = path_components[-1]
+        filenames = [filename,]
+        for lang in self.secondary_languages:
+            path_components[-1] = '{}.{}'.format(lang, basename)
+            filenames.append(os.path.join(*path_components))
+        return filenames
+
     def delete_from_path(self, path, is_ajax=False):
         """Deletes file, attempts to delete directory"""
         path, query_string = self.get_query_string_from_path(path)
-        filename = self.get_filename_from_path(
-            u'fresh{0}'.format(path), query_string, is_ajax=is_ajax)
-
-        for f in (filename, '{0}.gz'.format(filename)):
-            try:
-                if os.path.exists(f):
-                    os.remove(f)
-            except:
-                raise StaticGeneratorException('Could not delete file',
-                                               filename=f)
+        filename = self.get_filename_from_path(u'fresh{0}'.format(path),
+                                               query_string, is_ajax=is_ajax)
+        for localized_filename in self._get_localized_filenames(filename):
+            for f in (localized_filename, localized_filename + '.gz'):
+                try:
+                    if os.path.exists(f):
+                        os.remove(f)
+                except:
+                    raise StaticGeneratorException('Could not delete file',
+                                                   filename=f)
         try:
             os.rmdir(os.path.dirname(filename))
         except OSError:
