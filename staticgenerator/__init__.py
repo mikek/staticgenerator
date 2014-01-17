@@ -19,6 +19,7 @@ from django.db.models.query import QuerySet
 from django.conf import settings
 from django.test.client import RequestFactory
 from django.utils.http import urlquote
+from django.utils.translation import get_language
 from handlers import DummyHandler
 
 
@@ -105,8 +106,8 @@ class StaticGenerator(object):
         from staticgenerator import quick_publish
         quick_publish('/', Post.objects.live(), FlatPage)
 
-    The class accepts a list of 'resources' which can be any of the 
-    following: URL path (string), Model (class or instance), Manager, or 
+    The class accepts a list of 'resources' which can be any of the
+    following: URL path (string), Model (class or instance), Manager, or
     QuerySet.
 
     As of v1.1, StaticGenerator includes file and path deletion::
@@ -221,7 +222,12 @@ class StaticGenerator(object):
             # Always include a %3F in the file name, even if there are no query
             # parameters.  Using %3F instead of a question mark makes rewriting
             # possible in Apache.  Always including it makes rewriting easier.
-            path = '%sindex.html%%3F' % path
+            lang = get_language()
+            if lang == settings.LANGUAGE_CODE:
+                lang = ''
+            else:
+                lang += '.'
+            path = '{0}{1}index.html%3F'.format(path, lang)
         # will not work on windows... meh
         if query_string:
             # BingBot makes broken queries with non-ASCII query parameters

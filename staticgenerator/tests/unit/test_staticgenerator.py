@@ -5,9 +5,11 @@
 #         Instance of <class> has no <member>
 
 from contextlib import nested
+from django.conf import settings
 from django.db.models.query import QuerySet
 from django.test.utils import override_settings
 from django.test import TestCase
+from django.utils.translation import activate
 from mock import ANY, call, Mock, patch
 from nose.tools import raises
 import os
@@ -124,6 +126,19 @@ class StaticGeneratorWithWebRootSetting_Tests(TestCase):
         result = instance.get_filename_from_path('/foo/bar/', '')
 
         self.assertEqual('test_web_root/foo/bar/index.html%3F', result)
+
+    def test_get_lang_aware_filename_from_path_when_path_ends_with_slash(self):
+        for lang in ('uk', 'ru'):
+            # activate first non-default language
+            if lang != settings.LANGUAGE_CODE:
+                activate('ru')
+
+        instance = StaticGenerator()
+
+        result = instance.get_filename_from_path('/foo/bar/', '')
+
+        self.assertEqual('test_web_root/foo/bar/{}.index.html%3F'.format(lang),
+                         result)
 
     def test_publish_raises_when_unable_to_create_current_folder(self):
         instance = StaticGenerator()
